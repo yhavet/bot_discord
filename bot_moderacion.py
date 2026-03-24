@@ -10,7 +10,7 @@ import os
 load_dotenv()
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
-CANAL_GENERAL_ID = 1395584253097672726
+CANAL_CONFIGURADO_ID = 1395584253097672726
 ROL_PROTEGIDO = "creador"
 MAX_DENUNCIAS_POR_USUARIO = 1
 
@@ -99,7 +99,7 @@ async def menu_denuncia(interaction: discord.Interaction, message: discord.Messa
     acusado_miembro = interaction.guild.get_member(acusado.id)
 
     if acusado_miembro and tiene_rol_protegido(acusado_miembro):
-        await interaction.followup.send("No es posible denunciar a un usuario con el rol Creador.", ephemeral=True)
+        await interaction.followup.send(f"No es posible denunciar a un usuario con el rol {ROL_PROTEGIDO}.", ephemeral=True)
         return
 
     guild_id = interaction.guild_id
@@ -117,11 +117,14 @@ async def menu_denuncia(interaction: discord.Interaction, message: discord.Messa
     total = denuncias[guild_id][acusado.id]
 
     await interaction.followup.send(
-        f"Denuncia registrada. El usuario lleva {total} denuncia(s) en total.",
+        "Denuncia registrada.",
         ephemeral=True
     )
 
-    canal_publico = bot.get_channel(CANAL_GENERAL_ID) or interaction.channel
+    canal_publico = bot.get_channel(CANAL_CONFIGURADO_ID)
+    if canal_publico is None or canal_publico.guild.id != guild_id:
+        canal_publico = interaction.channel
+
     nivel_actual = obtener_nivel_actual(total)
     proximo = obtener_proximo_umbral(total)
 
@@ -156,18 +159,17 @@ async def menu_denuncia(interaction: discord.Interaction, message: discord.Messa
 
         try:
             if acusado_miembro:
-                await acusado_miembro.timeout(duracion_final, reason=f"Acumulacion de {total} denuncias (sancion #{veces})")
+                await acusado_miembro.timeout(duracion_final, reason=f"Acumulacion de {total} denuncias.")
             await canal_publico.send(
                 f"USUARIO AISLADO\n"
                 f"{acusado.mention} ha sido aislado por {duracion_texto} "
                 f"al alcanzar {total} denuncias.\n"
-                f"Esta es su sancion numero {veces} en este nivel.\n"
-                f"Cada reincidencia multiplica la duracion del aislamiento."
+                f"Sancion numero {veces} en este nivel."
             )
         except discord.Forbidden:
-            await canal_publico.send(f"No fue posible aislar a {acusado.display_name}. Verificar permisos del bot.")
+            await canal_publico.send(f"Error: Sin permisos para aislar a {acusado.display_name}.")
         except Exception as e:
-            await canal_publico.send(f"Error inesperado al procesar la sancion: {e}")
+            print(f"Error: {e}")
 
     else:
         if proximo:
@@ -188,9 +190,6 @@ async def menu_denuncia(interaction: discord.Interaction, message: discord.Messa
 if __name__ == "__main__":
     try:
         bot.run(BOT_TOKEN)
-    except KeyboardInterrupt:
-        print("Bot detenido.")
-        sys.exit(0)
-    except discord.LoginFailure:
-        print("Token invalido.")
+    except Exception as e:
+        print(f"Fallo al iniciar: {e}")
         sys.exit(1)
